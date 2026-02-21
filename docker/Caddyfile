@@ -1,0 +1,10 @@
+{$SERVER_HOST:localhost}, {$SERVER_IP:} {
+	handle_path /phpmyadmin/* {
+		reverse_proxy host.docker.internal:8081
+	}
+	handle /phpmyadmin {
+		redir /phpmyadmin/ permanent
+	}
+	reverse_proxy host.docker.internal:8080
+	tls internal
+}
