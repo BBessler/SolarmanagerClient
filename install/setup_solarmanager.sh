@@ -217,7 +217,7 @@ sudo systemctl restart apache2
 ### 80% .NET Core und Python Installation
 echo_step 80 "Installiere .NET Core und Python APIs..."
 wget -O - https://raw.githubusercontent.com/pjgpetecodes/dotnet9pi/main/install.sh | sudo bash
-install_if_missing python3 python3-pip
+install_if_missing python3 python3-pip python3-dev build-essential libffi-dev libjpeg-dev zlib1g-dev
 sudo pip3 install hyundai-kia-connect-api bimmer_connected --break-system-packages
 
 ### 83% GitHub Releases herunterladen
