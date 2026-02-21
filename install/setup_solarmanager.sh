@@ -3,19 +3,10 @@
 # Stoppe bei Fehlern
 set -e
 
-echo ""
-read -p "MariaDB Root-Passwort festlegen [solarmanager]: " DB_ROOT_PASSWORD
-DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-solarmanager}"
-
 # Fortschrittsanzeige Funktion
 echo_step() {
   echo -e "\n[ $1% ] $2"
 }
-### 10% System Update
-echo_step 10 "System aktualisieren..."
-sudo apt update
-sudo apt upgrade -y
-
 
 # Funktion zur Installation nur wenn Paket fehlt
 install_if_missing() {
@@ -31,10 +22,10 @@ install_if_missing() {
 
 clear
 
-echo "Starte Solarmanager-Setup..."
+echo "### Solarmanager Setup ###"
 echo ""
 
-### Hostname/URL abfragen
+### Alle Benutzereingaben am Anfang sammeln
 IP_ADDR=$(hostname -I | awk '{print $1}')
 if [ -z "$IP_ADDR" ]; then
   IP_ADDR="127.0.0.1"
@@ -48,7 +39,13 @@ echo ""
 read -p "Hostname/IP [solarmanager.local]: " SERVER_HOST
 SERVER_HOST="${SERVER_HOST:-solarmanager.local}"
 echo ""
-echo "[INFO] Solarmanager wird unter '$SERVER_HOST' eingerichtet."
+read -p "MariaDB Root-Passwort [solarmanager]: " DB_ROOT_PASSWORD
+DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-solarmanager}"
+echo ""
+echo "[INFO] Hostname:      $SERVER_HOST"
+echo "[INFO] DB-Passwort:   $DB_ROOT_PASSWORD"
+echo ""
+echo "Starte Installation..."
 
 
 ### 20% Apache, PHP, MariaDB Installation
@@ -67,28 +64,29 @@ install_if_missing phpmyadmin
 ### 40% MariaDB User Setup
 echo_step 40 "MariaDB Root- und pi-User einrichten..."
 
-SQL_SETUP="ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASSWORD';
+SQL_FILE=$(mktemp)
+cat > "$SQL_FILE" <<SQLEOF
+ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASSWORD';
 CREATE USER IF NOT EXISTS 'pi'@'%' IDENTIFIED BY '$DB_ROOT_PASSWORD';
 GRANT ALL PRIVILEGES ON *.* TO 'pi'@'%' WITH GRANT OPTION;
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '$DB_ROOT_PASSWORD' WITH GRANT OPTION;
-FLUSH PRIVILEGES;"
+FLUSH PRIVILEGES;
+SQLEOF
 
-# set -e kurz deaktivieren, da der erste Versuch fehlschlagen darf
+# set -e deaktivieren, da der erste Versuch fehlschlagen darf
 set +e
-echo "$SQL_SETUP" | sudo mysql > /dev/null 2>&1
-RESULT=$?
-if [ $RESULT -ne 0 ]; then
-  echo "$SQL_SETUP" | sudo mysql -u root -p"$DB_ROOT_PASSWORD" > /dev/null 2>&1
-  RESULT=$?
+sudo mysql < "$SQL_FILE" > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  sudo mysql -u root -p"$DB_ROOT_PASSWORD" < "$SQL_FILE" > /dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    echo "[FEHLER] MariaDB-Zugang fehlgeschlagen. Bitte Passwort pruefen."
+    rm -f "$SQL_FILE"
+    exit 1
+  fi
 fi
 set -e
-
-if [ $RESULT -eq 0 ]; then
-  echo "[OK] MariaDB User eingerichtet."
-else
-  echo "[FEHLER] MariaDB-Zugang fehlgeschlagen. Bitte Passwort pruefen."
-  exit 1
-fi
+rm -f "$SQL_FILE"
+echo "[OK] MariaDB User eingerichtet."
 
 ### 50% MariaDB Konfiguration
 echo_step 50 "Erlaube externen Zugriff auf MariaDB..."
