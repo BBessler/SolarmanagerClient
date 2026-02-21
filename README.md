@@ -30,17 +30,7 @@ Das Script installiert und konfiguriert automatisch:
 - Solarmanager Backend & Frontend (neuestes Release)
 - Systemd-Service für den automatischen Start
 
-### 2. Datenbank einrichten (optional)
-
-Falls eine bestehende Datenbank-Sicherung (`solardb.sql`) importiert werden soll:
-
-```bash
-wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_DB.sh
-chmod +x setup_DB.sh
-sudo ./setup_DB.sh
-```
-
-### 3. SSL aktivieren (optional)
+### 2. SSL aktivieren (optional)
 
 HTTPS mit Self-Signed-Zertifikat einrichten:
 
