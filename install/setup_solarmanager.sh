@@ -64,14 +64,17 @@ install_if_missing phpmyadmin
 
 ### 40% MariaDB User Setup
 echo_step 40 "MariaDB Root- und pi-User einrichten..."
-# Erst ohne Passwort versuchen, dann mit Passwort
-if sudo mysql -e "SELECT 1" &>/dev/null; then
-  MYSQL_CMD="sudo mysql"
-else
-  MYSQL_CMD="sudo mysql -u root -p$DB_ROOT_PASSWORD"
-fi
 
-$MYSQL_CMD <<EOF
+# Hilfsfunktion: MySQL-Befehl ausfuehren (erst ohne, dann mit Passwort)
+run_mysql() {
+  if sudo mysql -e "SELECT 1" &>/dev/null; then
+    sudo mysql "$@"
+  else
+    sudo mysql -u root -p"$DB_ROOT_PASSWORD" "$@"
+  fi
+}
+
+run_mysql <<EOF
 ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_ROOT_PASSWORD';
 CREATE USER IF NOT EXISTS 'pi'@'%' IDENTIFIED BY '$DB_ROOT_PASSWORD';
 GRANT ALL PRIVILEGES ON *.* TO 'pi'@'%' WITH GRANT OPTION;
@@ -334,7 +337,7 @@ DB_PASS="$DB_ROOT_PASSWORD"
 SQL_FILE="solardb.sql"
 
 echo "[INFO] Erstelle Datenbank '$DB_NAME' (falls nicht vorhanden)..."
-$MYSQL_CMD -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
+run_mysql -e "CREATE DATABASE IF NOT EXISTS $DB_NAME;"
 
 if [ -f "$SQL_FILE" ]; then
   echo "[INFO] SQL-Datei gefunden: $SQL_FILE"
@@ -342,7 +345,7 @@ if [ -f "$SQL_FILE" ]; then
   if [[ "$antwort" =~ ^[Jj]$ ]]; then
 
     echo "[INFO] Importiere SQL-Daten..."
-    $MYSQL_CMD "$DB_NAME" < "$SQL_FILE"
+    run_mysql "$DB_NAME" < "$SQL_FILE"
 
     if [ $? -eq 0 ]; then
       echo "[OK] Datenbank '$DB_NAME' erfolgreich importiert."
