@@ -73,11 +73,18 @@ GRANT ALL PRIVILEGES ON *.* TO 'pi'@'%' WITH GRANT OPTION;
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '$DB_ROOT_PASSWORD' WITH GRANT OPTION;
 FLUSH PRIVILEGES;"
 
-# Erst ohne Passwort (unix_socket), dann mit Passwort versuchen
-if echo "$SQL_SETUP" | sudo mysql 2>/dev/null; then
-  echo "[OK] MariaDB User eingerichtet (unix_socket)."
-elif echo "$SQL_SETUP" | sudo mysql -u root -p"$DB_ROOT_PASSWORD" 2>/dev/null; then
-  echo "[OK] MariaDB User eingerichtet (Passwort)."
+# set -e kurz deaktivieren, da der erste Versuch fehlschlagen darf
+set +e
+echo "$SQL_SETUP" | sudo mysql > /dev/null 2>&1
+RESULT=$?
+if [ $RESULT -ne 0 ]; then
+  echo "$SQL_SETUP" | sudo mysql -u root -p"$DB_ROOT_PASSWORD" > /dev/null 2>&1
+  RESULT=$?
+fi
+set -e
+
+if [ $RESULT -eq 0 ]; then
+  echo "[OK] MariaDB User eingerichtet."
 else
   echo "[FEHLER] MariaDB-Zugang fehlgeschlagen. Bitte Passwort pruefen."
   exit 1
