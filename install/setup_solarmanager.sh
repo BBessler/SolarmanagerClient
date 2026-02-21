@@ -29,9 +29,24 @@ install_if_missing() {
 
 clear
 
-echo "Starte automatische Erweiterung der Root-Partition..."
-
 echo "Starte Solarmanager-Setup..."
+echo ""
+
+### Hostname/URL abfragen
+IP_ADDR=$(hostname -I | awk '{print $1}')
+if [ -z "$IP_ADDR" ]; then
+  IP_ADDR="127.0.0.1"
+fi
+
+echo "Erkannte IP-Adresse: $IP_ADDR"
+echo ""
+echo "Unter welcher Adresse soll der Solarmanager erreichbar sein?"
+echo "  Beispiele: solarmanager.local, 192.168.178.50, mein-solar.home"
+echo ""
+read -p "Hostname/IP [solarmanager.local]: " SERVER_HOST
+SERVER_HOST="${SERVER_HOST:-solarmanager.local}"
+echo ""
+echo "[INFO] Solarmanager wird unter '$SERVER_HOST' eingerichtet."
 
 
 ### 20% Apache, PHP, MariaDB Installation
@@ -86,30 +101,32 @@ sudo a2enmod proxy
 sudo a2enmod proxy_http
 
 ### 63% SSL-Zertifikat generieren
-echo_step 63 "SSL-Zertifikat prüfen/generieren..."
+echo_step 63 "SSL-Zertifikat generieren..."
 CERT_DIR="/etc/ssl/solarmanager"
 CERT_FILE="$CERT_DIR/solarmanager.crt"
 KEY_FILE="$CERT_DIR/solarmanager.key"
-IP_ADDR=$(hostname -I | awk '{print $1}')
-if [ -z "$IP_ADDR" ]; then
-  IP_ADDR="127.0.0.1"
+
+# Zertifikat immer neu generieren, damit der Hostname stimmt
+echo "[INFO] Generiere Self-Signed-Zertifikat (10 Jahre) fuer '$SERVER_HOST'..."
+sudo mkdir -p "$CERT_DIR"
+
+# SubjectAltName je nach Eingabe (IP oder DNS)
+SAN_ENTRIES="DNS:localhost,IP:$IP_ADDR"
+if [[ "$SERVER_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  SAN_ENTRIES="IP:$SERVER_HOST,DNS:localhost"
+else
+  SAN_ENTRIES="DNS:$SERVER_HOST,DNS:localhost,IP:$IP_ADDR"
 fi
 
-if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
-  echo "[INFO] Zertifikat existiert bereits - überspringe Generierung."
-else
-  echo "[INFO] Generiere Self-Signed-Zertifikat (10 Jahre)..."
-  sudo mkdir -p "$CERT_DIR"
-  sudo openssl req -x509 -nodes -days 3650 \
-    -newkey rsa:2048 \
-    -keyout "$KEY_FILE" \
-    -out "$CERT_FILE" \
-    -subj "/CN=solarmanager.local" \
-    -addext "subjectAltName=DNS:solarmanager.local,DNS:localhost,IP:$IP_ADDR"
-  sudo chmod 600 "$KEY_FILE"
-  sudo chmod 644 "$CERT_FILE"
-  echo "[OK] Zertifikat generiert."
-fi
+sudo openssl req -x509 -nodes -days 3650 \
+  -newkey rsa:2048 \
+  -keyout "$KEY_FILE" \
+  -out "$CERT_FILE" \
+  -subj "/CN=$SERVER_HOST" \
+  -addext "subjectAltName=$SAN_ENTRIES"
+sudo chmod 600 "$KEY_FILE"
+sudo chmod 644 "$CERT_FILE"
+echo "[OK] Zertifikat generiert."
 
 ### 66% Apache VirtualHosts einrichten
 echo_step 66 "Apache VirtualHosts einrichten..."
@@ -117,7 +134,7 @@ echo_step 66 "Apache VirtualHosts einrichten..."
 # HTTPS Frontend (Port 443)
 sudo tee /etc/apache2/sites-available/solarmanager-ssl.conf > /dev/null <<EOF
 <VirtualHost *:443>
-    ServerName solarmanager.local
+    ServerName $SERVER_HOST
     DocumentRoot /var/www/html
 
     SSLEngine on
@@ -142,7 +159,7 @@ EOF
 # HTTPS Backend-API (Port 453)
 sudo tee /etc/apache2/sites-available/solarmanager-api-ssl.conf > /dev/null <<EOF
 <VirtualHost *:453>
-    ServerName solarmanager.local
+    ServerName $SERVER_HOST
     ProxyPreserveHost On
     ProxyPass / http://localhost:5000/
     ProxyPassReverse / http://localhost:5000/
@@ -161,7 +178,7 @@ EOF
 # HTTP→HTTPS Redirect Frontend (Port 80 → 443)
 sudo tee /etc/apache2/sites-available/solarmanager-redirect.conf > /dev/null <<EOF
 <VirtualHost *:80>
-    ServerName solarmanager.local
+    ServerName $SERVER_HOST
     RewriteEngine On
     RewriteRule ^(.*)$ https://%{HTTP_HOST}\$1 [R=301,L]
 </VirtualHost>
@@ -170,7 +187,7 @@ EOF
 # HTTP→HTTPS Redirect Backend-API (Port 90 → 453)
 sudo tee /etc/apache2/sites-available/solarmanager-api-redirect.conf > /dev/null <<EOF
 <VirtualHost *:90>
-    ServerName solarmanager.local
+    ServerName $SERVER_HOST
     RewriteEngine On
     RewriteCond %{HTTP_HOST} ^(.+?)(?::90)?$
     RewriteRule ^(.*)$ https://%1:453\$1 [R=301,L]
@@ -259,6 +276,16 @@ download_latest_release "backend-" "$WEB_DIR/backend" "Backend"
 # Frontend herunterladen
 download_latest_release "frontend-" "$WEB_DIR" "Frontend"
 
+### 84% Frontend-Konfiguration anpassen
+echo_step 84 "Frontend Backend-URL konfigurieren..."
+sudo tee "$WEB_DIR/config.json" > /dev/null <<EOF
+{
+  "API_URL": "https://$SERVER_HOST:453/",
+  "APP_ENV": "production"
+}
+EOF
+echo "[OK] Frontend config.json auf 'https://$SERVER_HOST:453/' gesetzt."
+
 ### 85% Rechte setzen
 echo_step 85 "Setze Rechte für /var/www/html..."
 sudo chmod -R 744 /var/www/html
@@ -342,13 +369,13 @@ echo "### Einrichtung abgeschlossen! ###"
 echo "Backend und Frontend wurden automatisch heruntergeladen und eingerichtet."
 echo ""
 echo "Zugriff:"
-echo "  Frontend:    https://solarmanager.local"
-echo "  Backend-API: https://solarmanager.local:453"
-echo "  phpMyAdmin:  https://solarmanager.local/phpmyadmin"
+echo "  Frontend:    https://$SERVER_HOST"
+echo "  Backend-API: https://$SERVER_HOST:453"
+echo "  phpMyAdmin:  https://$SERVER_HOST/phpmyadmin"
 echo ""
 echo "HTTP-Redirects aktiv:"
-echo "  http://solarmanager.local      -> https://solarmanager.local"
-echo "  http://solarmanager.local:90   -> https://solarmanager.local:453"
+echo "  http://$SERVER_HOST      -> https://$SERVER_HOST"
+echo "  http://$SERVER_HOST:90   -> https://$SERVER_HOST:453"
 echo ""
 echo "Hinweis: Self-Signed-Zertifikat - Sicherheitswarnung im Browser einmalig bestaetigen."
 echo ""
