@@ -62,47 +62,140 @@ echo_step 50 "Erlaube externen Zugriff auf MariaDB..."
 sudo sed -i 's/^bind-address\s*=.*/#bind-address = 127.0.0.1/' /etc/mysql/mariadb.conf.d/50-server.cnf
 sudo systemctl restart mariadb
 
-### 60% Firewall Konfiguration
-echo_step 60 "Firewall konfigurieren und Ports freigeben (22, 80, 3306, 5000)..."
+### 55% Firewall Konfiguration
+echo_step 55 "Firewall konfigurieren und Ports freigeben..."
 sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 90/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 453/tcp
 sudo ufw allow 3306/tcp
 sudo ufw allow 5000/tcp
 sudo ufw --force enable
 sudo ufw reload
 
-### 70% Apache Konfiguration
-echo_step 70 "Apache Konfiguration anpassen..."
+### 60% Apache Module aktivieren
+echo_step 60 "Apache Module aktivieren..."
 if ! grep -q 'Include /etc/phpmyadmin/apache.conf' /etc/apache2/apache2.conf; then
   sudo bash -c "echo 'Include /etc/phpmyadmin/apache.conf' >> /etc/apache2/apache2.conf"
 fi
 sudo a2enmod rewrite
+sudo a2enmod ssl
+sudo a2enmod headers
+sudo a2enmod proxy
+sudo a2enmod proxy_http
 
-CONF_FILE="/etc/apache2/sites-enabled/000-default.conf"
-INSERTION="<Directory \"/var/www/html\">
-    RewriteEngine on
-    # Don't rewrite files or directories
-    RewriteCond %{REQUEST_FILENAME} -f [OR]
-    RewriteCond %{REQUEST_FILENAME} -d
-    RewriteRule ^ - [L]
-    # Rewrite everything else to index.html to allow html5 state links
-    RewriteRule ^ index.html [L]
-</Directory>"
-
-# Prüfen, ob der Block bereits existiert
-if grep -q "<Directory \"/var/www/html\">" "$CONF_FILE"; then
-    echo "Eintrag existiert bereits in der Datei. Keine Änderungen vorgenommen."
-else
-    echo "Füge den Eintrag in $CONF_FILE ein..."
-    echo "" >> "$CONF_FILE"
-    echo "$INSERTION" >> "$CONF_FILE"
-    echo "Eintrag wurde hinzugefügt."
-
-    # Apache neu starten
-    echo "Apache wird neu gestartet..."
+### 63% SSL-Zertifikat generieren
+echo_step 63 "SSL-Zertifikat prüfen/generieren..."
+CERT_DIR="/etc/ssl/solarmanager"
+CERT_FILE="$CERT_DIR/solarmanager.crt"
+KEY_FILE="$CERT_DIR/solarmanager.key"
+IP_ADDR=$(hostname -I | awk '{print $1}')
+if [ -z "$IP_ADDR" ]; then
+  IP_ADDR="127.0.0.1"
 fi
-systemctl restart apache2
+
+if [ -f "$CERT_FILE" ] && [ -f "$KEY_FILE" ]; then
+  echo "[INFO] Zertifikat existiert bereits - überspringe Generierung."
+else
+  echo "[INFO] Generiere Self-Signed-Zertifikat (10 Jahre)..."
+  sudo mkdir -p "$CERT_DIR"
+  sudo openssl req -x509 -nodes -days 3650 \
+    -newkey rsa:2048 \
+    -keyout "$KEY_FILE" \
+    -out "$CERT_FILE" \
+    -subj "/CN=solarmanager.local" \
+    -addext "subjectAltName=DNS:solarmanager.local,DNS:localhost,IP:$IP_ADDR"
+  sudo chmod 600 "$KEY_FILE"
+  sudo chmod 644 "$CERT_FILE"
+  echo "[OK] Zertifikat generiert."
+fi
+
+### 66% Apache VirtualHosts einrichten
+echo_step 66 "Apache VirtualHosts einrichten..."
+
+# HTTPS Frontend (Port 443)
+sudo tee /etc/apache2/sites-available/solarmanager-ssl.conf > /dev/null <<EOF
+<VirtualHost *:443>
+    ServerName solarmanager.local
+    DocumentRoot /var/www/html
+
+    SSLEngine on
+    SSLCertificateFile $CERT_FILE
+    SSLCertificateKeyFile $KEY_FILE
+
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    <Directory "/var/www/html">
+        RewriteEngine on
+        RewriteCond %{REQUEST_FILENAME} -f [OR]
+        RewriteCond %{REQUEST_FILENAME} -d
+        RewriteRule ^ - [L]
+        RewriteRule ^ index.html [L]
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/solarmanager-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/solarmanager-ssl-access.log common
+</VirtualHost>
+EOF
+
+# HTTPS Backend-API (Port 453)
+sudo tee /etc/apache2/sites-available/solarmanager-api-ssl.conf > /dev/null <<EOF
+<VirtualHost *:453>
+    ServerName solarmanager.local
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:5000/
+    ProxyPassReverse / http://localhost:5000/
+
+    SSLEngine on
+    SSLCertificateFile $CERT_FILE
+    SSLCertificateKeyFile $KEY_FILE
+
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+    ErrorLog \${APACHE_LOG_DIR}/solarmanager-api-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/solarmanager-api-ssl-access.log common
+</VirtualHost>
+EOF
+
+# HTTP→HTTPS Redirect Frontend (Port 80 → 443)
+sudo tee /etc/apache2/sites-available/solarmanager-redirect.conf > /dev/null <<EOF
+<VirtualHost *:80>
+    ServerName solarmanager.local
+    RewriteEngine On
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}\$1 [R=301,L]
+</VirtualHost>
+EOF
+
+# HTTP→HTTPS Redirect Backend-API (Port 90 → 453)
+sudo tee /etc/apache2/sites-available/solarmanager-api-redirect.conf > /dev/null <<EOF
+<VirtualHost *:90>
+    ServerName solarmanager.local
+    RewriteEngine On
+    RewriteCond %{HTTP_HOST} ^(.+?)(?::90)?$
+    RewriteRule ^(.*)$ https://%1:453\$1 [R=301,L]
+</VirtualHost>
+EOF
+
+# Ports eintragen
+if ! grep -q 'Listen 443' /etc/apache2/ports.conf; then
+  sudo bash -c "echo 'Listen 443' >> /etc/apache2/ports.conf"
+fi
+if ! grep -q 'Listen 453' /etc/apache2/ports.conf; then
+  sudo bash -c "echo 'Listen 453' >> /etc/apache2/ports.conf"
+fi
+if ! grep -q 'Listen 90' /etc/apache2/ports.conf; then
+  sudo bash -c "echo 'Listen 90' >> /etc/apache2/ports.conf"
+fi
+
+# Alte Sites deaktivieren, neue aktivieren
+sudo a2dissite 000-default.conf 2>/dev/null || true
+sudo a2dissite solarmanager.conf 2>/dev/null || true
+sudo a2ensite solarmanager-ssl.conf
+sudo a2ensite solarmanager-api-ssl.conf
+sudo a2ensite solarmanager-redirect.conf
+sudo a2ensite solarmanager-api-redirect.conf
+sudo systemctl restart apache2
 
 ### 80% .NET Core und Python Installation
 echo_step 80 "Installiere .NET Core und Python APIs..."
@@ -194,36 +287,11 @@ EOF
 sudo systemctl enable solarmanager.service
 sudo systemctl start solarmanager.service
 
-### 95% Apache Optimierungen
-echo_step 95 "Apache Optimierungen durchführen..."
+### 95% Apache Benutzerrechte
+echo_step 95 "Apache Benutzerrechte setzen..."
 sudo usermod -a -G www-data pi
-sudo chown -R -f www-data:www-data /var/www/html
-sudo a2enmod proxy
-sudo a2enmod proxy_http
-sudo systemctl restart apache2
 
-### 98% Virtual Host Konfiguration
-echo_step 98 "Virtuellen Host für Solarmanager einrichten..."
-sudo tee /etc/apache2/sites-available/solarmanager.conf > /dev/null <<EOF
-<VirtualHost *:90>
-    ProxyPreserveHost On
-    ProxyPass / http://localhost:5000/
-    ProxyPassReverse / http://localhost:5000/
-    ServerName www.solarmanager.com
-    ServerAlias *.solarmanager.com
-    ErrorLog \${APACHE_LOG_DIR}solarmanager-error.log
-    CustomLog \${APACHE_LOG_DIR}solarmanager-access.log common
-</VirtualHost>
-EOF
-
-sudo a2ensite solarmanager.conf
-if ! grep -q 'Listen 90' /etc/apache2/ports.conf; then
-  sudo bash -c "echo 'Listen 90' >> /etc/apache2/ports.conf"
-fi
-sudo systemctl reload apache2
-sudo systemctl restart apache2
-
-### 99% Solardb-Datenbank erstellen und importieren (nur bei SQL-Datei und Zustimmung)
+### 97% Solardb-Datenbank erstellen und importieren (nur bei SQL-Datei und Zustimmung)
 echo_step 99 "Prüfe auf vorhandene SQL-Datei und frage nach Datenbank-Wiederherstellung..."
 
 DB_NAME="solardb"
@@ -273,6 +341,17 @@ clear
 echo "### Einrichtung abgeschlossen! ###"
 echo "Backend und Frontend wurden automatisch heruntergeladen und eingerichtet."
 echo ""
-echo "Nützliche Befehle:"
+echo "Zugriff:"
+echo "  Frontend:    https://solarmanager.local"
+echo "  Backend-API: https://solarmanager.local:453"
+echo "  phpMyAdmin:  https://solarmanager.local/phpmyadmin"
+echo ""
+echo "HTTP-Redirects aktiv:"
+echo "  http://solarmanager.local      -> https://solarmanager.local"
+echo "  http://solarmanager.local:90   -> https://solarmanager.local:453"
+echo ""
+echo "Hinweis: Self-Signed-Zertifikat - Sicherheitswarnung im Browser einmalig bestaetigen."
+echo ""
+echo "Nuetzliche Befehle:"
 echo "  sudo systemctl restart solarmanager.service   # Backend neu starten"
-echo "  sudo systemctl status solarmanager.service     # Status prüfen"
+echo "  sudo systemctl status solarmanager.service     # Status pruefen"

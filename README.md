@@ -21,7 +21,7 @@ sudo ./setup_solarmanager.sh
 ```
 
 Das Script installiert und konfiguriert automatisch:
-- Apache Webserver mit PHP
+- Apache Webserver mit PHP und SSL (Self-Signed-Zertifikat)
 - MariaDB Datenbank
 - phpMyAdmin
 - .NET Runtime
@@ -29,30 +29,27 @@ Das Script installiert und konfiguriert automatisch:
 - Firewall (UFW)
 - Solarmanager Backend & Frontend (neuestes Release)
 - Systemd-Service für den automatischen Start
+- HTTP → HTTPS Redirects
 
-### 2. SSL aktivieren (optional)
+### 2. Datenbank einrichten (optional)
 
-HTTPS mit Self-Signed-Zertifikat einrichten:
+Falls eine bestehende Datenbank-Sicherung (`solardb.sql`) importiert werden soll:
 
 ```bash
-wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_ssl.sh
-chmod +x setup_ssl.sh
-sudo ./setup_ssl.sh
+wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_DB.sh
+chmod +x setup_DB.sh
+sudo ./setup_DB.sh
 ```
-
-Nach der SSL-Einrichtung:
-- Frontend: `https://solarmanager.local`
-- Backend-API: `https://solarmanager.local:453`
-
-> **Hinweis:** Da ein Self-Signed-Zertifikat verwendet wird, muss die Sicherheitswarnung im Browser einmalig bestätigt werden.
 
 ## Zugriff nach der Installation
 
 | Dienst | URL |
 |--------|-----|
-| Frontend | `http://solarmanager.local` |
-| Backend-API | `http://solarmanager.local:90` |
-| phpMyAdmin | `http://solarmanager.local/phpmyadmin` |
+| Frontend | `https://solarmanager.local` |
+| Backend-API | `https://solarmanager.local:453` |
+| phpMyAdmin | `https://solarmanager.local/phpmyadmin` |
+
+> **Hinweis:** Da ein Self-Signed-Zertifikat verwendet wird, muss die Sicherheitswarnung im Browser einmalig bestätigt werden.
 
 ## Nützliche Befehle
 
