@@ -66,4 +66,15 @@ sudo journalctl -u solarmanager.service -f
 
 ## Update
 
-Um auf die neueste Version zu aktualisieren, das Setup-Script erneut ausführen. Bestehende Konfigurationen und die Datenbank bleiben erhalten.
+Um Backend und Frontend auf die neueste Version zu aktualisieren:
+
+```bash
+wget -O update_solarmanager.sh https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/update_solarmanager.sh
+chmod +x update_solarmanager.sh
+sudo ./update_solarmanager.sh
+```
+
+Das Update-Script:
+- Lädt die neuesten Releases herunter
+- Sichert und stellt die Frontend-Konfiguration (`config.json`) automatisch wieder her
+- Startet das Backend neu
