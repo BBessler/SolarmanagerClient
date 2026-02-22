@@ -325,7 +325,9 @@ echo "[OK] Frontend config.json auf 'https://$SERVER_HOST:453/' gesetzt."
 
 ### 85% Rechte setzen
 echo_step 85 "Setze Rechte für /var/www/html..."
-sudo chmod -R 744 /var/www/html
+sudo chown -R pi:pi "$WEB_DIR"
+sudo find "$WEB_DIR" -type d -exec chmod 755 {} \;
+sudo find "$WEB_DIR" -type f -exec chmod 644 {} \;
 
 ### 90% Erstelle Solarmanager Service
 echo_step 90 "Solarmanager Service erstellen..."
@@ -387,18 +389,7 @@ else
 fi
 
 ### 100% Abschluss
-echo_step 100 "Setze abschließende Rechte und beende Setup..."
-sudo chown -R www-data:www-data /var/www/html
-sudo chmod -R 775 /var/www/html
-WEB_DIR="/var/www/html"
-
-USER="pi"
-GROUP="pi"
-
-sudo chown -R $USER:$GROUP $WEB_DIR
-
-sudo find $WEB_DIR -type d -exec chmod 755 {} \;
-sudo find $WEB_DIR -type f -exec chmod 644 {} \;
+echo_step 100 "Setup abschließen..."
 
 
 clear
