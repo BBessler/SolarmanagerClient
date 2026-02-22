@@ -49,7 +49,12 @@ sudo ./setup_DB.sh
 | Backend-API | `https://solarmanager.local:453` |
 | phpMyAdmin | `https://solarmanager.local/phpmyadmin` |
 
-> **Hinweis:** Da ein Self-Signed-Zertifikat verwendet wird, muss die Sicherheitswarnung im Browser einmalig bestätigt werden.
+> **Hinweis:** Da ein Self-Signed-Zertifikat verwendet wird, zeigt der Browser beim ersten Zugriff eine Sicherheitswarnung an. Diese muss einmalig bestätigt werden:
+> - **Chrome/Edge:** „Erweitert" → „Weiter zu … (unsicher)"
+> - **Firefox:** „Erweitert…" → „Risiko akzeptieren und fortfahren"
+> - **Safari:** „Details einblenden" → „Diese Website besuchen"
+>
+> Die Warnung erscheint sowohl für das Frontend (Port 443) als auch für die Backend-API (Port 453) – beide müssen einmalig bestätigt werden.
 
 ## Nützliche Befehle
 
