@@ -48,6 +48,27 @@ echo ""
 echo "Starte Installation..."
 
 
+### 15% Hostname und mDNS (Avahi) einrichten
+echo_step 15 "Hostname und mDNS einrichten..."
+if [[ "$SERVER_HOST" == *.local ]]; then
+  SHORT_HOST="${SERVER_HOST%.local}"
+  echo "[INFO] Setze Hostname auf '$SHORT_HOST'..."
+  echo "$SHORT_HOST" | sudo tee /etc/hostname > /dev/null
+  sudo hostnamectl set-hostname "$SHORT_HOST" 2>/dev/null || true
+  if ! grep -q "$SHORT_HOST" /etc/hosts; then
+    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$SHORT_HOST/" /etc/hosts
+    if ! grep -q "$SHORT_HOST" /etc/hosts; then
+      sudo bash -c "echo '127.0.1.1	$SHORT_HOST' >> /etc/hosts"
+    fi
+  fi
+  install_if_missing avahi-daemon
+  sudo systemctl enable avahi-daemon
+  sudo systemctl start avahi-daemon
+  echo "[OK] mDNS aktiv - '$SERVER_HOST' im Netzwerk erreichbar."
+else
+  echo "[INFO] Kein .local-Hostname - mDNS wird nicht eingerichtet."
+fi
+
 ### 20% Apache, PHP, MariaDB Installation
 echo_step 20 "Installiere Apache, PHP, MariaDB und notwendige Pakete..."
 install_if_missing apache2 php libapache2-mod-php mariadb-server php-mysql debconf-utils ufw sshpass
