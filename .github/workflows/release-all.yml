@@ -1,0 +1,241 @@
+name: Release Backend & Frontend
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Letzte Release-Tags ermitteln
+      - name: Letzten Backend-Tag ermitteln
+        id: last_backend
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          TAG=$(gh api repos/BBessler/SolarmanagerClient/releases --jq '[.[] | select(.tag_name | startswith("backend-"))][0].tag_name // empty' 2>/dev/null || true)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Letzter Backend-Tag: ${TAG:-keiner}"
+
+      - name: Letzten Frontend-Tag ermitteln
+        id: last_frontend
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          TAG=$(gh api repos/BBessler/SolarmanagerClient/releases --jq '[.[] | select(.tag_name | startswith("frontend-"))][0].tag_name // empty' 2>/dev/null || true)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Letzter Frontend-Tag: ${TAG:-keiner}"
+
+      # 2. Commit-Historie aus privaten Repos holen (seit letztem Release)
+      - name: Backend-Commits sammeln
+        id: backend_commits
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          LAST_TAG="${{ steps.last_backend.outputs.tag }}"
+
+          if [ -n "$LAST_TAG" ]; then
+            # Erstellungsdatum des letzten Releases holen
+            SINCE=$(gh api repos/BBessler/SolarmanagerClient/releases --jq \
+              "[.[] | select(.tag_name == \"$LAST_TAG\")][0].created_at // empty" 2>/dev/null || true)
+          fi
+
+          if [ -n "$SINCE" ]; then
+            COMMITS=$(gh api "repos/BBessler/Solarmanager/commits?since=$SINCE&per_page=100" \
+              --jq '[.[] | "- " + (.commit.message | split("\n")[0])] | join("\n")' 2>/dev/null || true)
+          else
+            # Kein vorheriges Release: letzte 20 Commits
+            COMMITS=$(gh api "repos/BBessler/Solarmanager/commits?per_page=20" \
+              --jq '[.[] | "- " + (.commit.message | split("\n")[0])] | join("\n")' 2>/dev/null || true)
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- Keine neuen Commits"
+          fi
+
+          # Multi-line Output
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Frontend-Commits sammeln
+        id: frontend_commits
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          LAST_TAG="${{ steps.last_frontend.outputs.tag }}"
+
+          if [ -n "$LAST_TAG" ]; then
+            SINCE=$(gh api repos/BBessler/SolarmanagerClient/releases --jq \
+              "[.[] | select(.tag_name == \"$LAST_TAG\")][0].created_at // empty" 2>/dev/null || true)
+          fi
+
+          if [ -n "$SINCE" ]; then
+            COMMITS=$(gh api "repos/BBessler/solarmanager_Frotnend/commits?since=$SINCE&per_page=100" \
+              --jq '[.[] | "- " + (.commit.message | split("\n")[0])] | join("\n")' 2>/dev/null || true)
+          else
+            COMMITS=$(gh api "repos/BBessler/solarmanager_Frotnend/commits?per_page=20" \
+              --jq '[.[] | "- " + (.commit.message | split("\n")[0])] | join("\n")' 2>/dev/null || true)
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- Keine neuen Commits"
+          fi
+
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo "$COMMITS"
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
+      # 3. Backend-Release-Workflow triggern
+      - name: Backend-Release triggern
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          gh api repos/BBessler/Solarmanager/actions/workflows/release.yaml/dispatches \
+            -f ref=main
+
+      # 4. Frontend-Release-Workflow triggern
+      - name: Frontend-Release triggern
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          gh api repos/BBessler/solarmanager_Frotnend/actions/workflows/release.yml/dispatches \
+            -f ref=master
+
+      # 5. Auf Abschluss warten
+      - name: Auf Backend-Workflow warten
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          echo "Warte 15 Sekunden bis Workflow-Run sichtbar ist..."
+          sleep 15
+
+          # Neuesten Run finden
+          for i in $(seq 1 60); do
+            RUN=$(gh api "repos/BBessler/Solarmanager/actions/workflows/release.yaml/runs?per_page=1" \
+              --jq '.workflow_runs[0] | "\(.id) \(.status) \(.conclusion // "null")"')
+
+            RUN_ID=$(echo "$RUN" | awk '{print $1}')
+            STATUS=$(echo "$RUN" | awk '{print $2}')
+            CONCLUSION=$(echo "$RUN" | awk '{print $3}')
+
+            echo "Backend-Run $RUN_ID: status=$STATUS conclusion=$CONCLUSION (Versuch $i/60)"
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "Backend-Release erfolgreich!"
+                break
+              else
+                echo "::error::Backend-Release fehlgeschlagen: $CONCLUSION"
+                exit 1
+              fi
+            fi
+
+            sleep 15
+          done
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::Backend-Release Timeout nach 15 Minuten"
+            exit 1
+          fi
+
+      - name: Auf Frontend-Workflow warten
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          for i in $(seq 1 60); do
+            RUN=$(gh api "repos/BBessler/solarmanager_Frotnend/actions/workflows/release.yml/runs?per_page=1" \
+              --jq '.workflow_runs[0] | "\(.id) \(.status) \(.conclusion // "null")"')
+
+            RUN_ID=$(echo "$RUN" | awk '{print $1}')
+            STATUS=$(echo "$RUN" | awk '{print $2}')
+            CONCLUSION=$(echo "$RUN" | awk '{print $3}')
+
+            echo "Frontend-Run $RUN_ID: status=$STATUS conclusion=$CONCLUSION (Versuch $i/60)"
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "Frontend-Release erfolgreich!"
+                break
+              else
+                echo "::error::Frontend-Release fehlgeschlagen: $CONCLUSION"
+                exit 1
+              fi
+            fi
+
+            sleep 15
+          done
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::Frontend-Release Timeout nach 15 Minuten"
+            exit 1
+          fi
+
+      # 6. Release-Notes mit Changelog aktualisieren
+      - name: Backend-Release-Notes aktualisieren
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          VERSION=$(date +'%Y.%m.%d')
+          TAG="backend-$VERSION"
+
+          # Release-ID finden
+          RELEASE_ID=$(gh api "repos/BBessler/SolarmanagerClient/releases/tags/$TAG" --jq '.id' 2>/dev/null || true)
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::warning::Backend-Release $TAG nicht gefunden, ueberspringe Notes-Update"
+            exit 0
+          fi
+
+          BODY="## Backend Änderungen
+          ${{ steps.backend_commits.outputs.changelog }}"
+
+          # Einrückung entfernen (heredoc-artig)
+          BODY=$(echo "$BODY" | sed 's/^          //')
+
+          gh api "repos/BBessler/SolarmanagerClient/releases/$RELEASE_ID" \
+            -X PATCH \
+            -f body="$BODY"
+
+          echo "Backend-Release-Notes aktualisiert"
+
+      - name: Frontend-Release-Notes aktualisieren
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          VERSION=$(date +'%Y.%m.%d')
+          TAG="frontend-$VERSION"
+
+          RELEASE_ID=$(gh api "repos/BBessler/SolarmanagerClient/releases/tags/$TAG" --jq '.id' 2>/dev/null || true)
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::warning::Frontend-Release $TAG nicht gefunden, ueberspringe Notes-Update"
+            exit 0
+          fi
+
+          BODY="## Frontend Änderungen
+          ${{ steps.frontend_commits.outputs.changelog }}"
+
+          BODY=$(echo "$BODY" | sed 's/^          //')
+
+          gh api "repos/BBessler/SolarmanagerClient/releases/$RELEASE_ID" \
+            -X PATCH \
+            -f body="$BODY"
+
+          echo "Frontend-Release-Notes aktualisiert"
+
+      - name: Zusammenfassung
+        run: |
+          VERSION=$(date +'%Y.%m.%d')
+          echo "## Release $VERSION abgeschlossen" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Backend Änderungen" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.backend_commits.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend Änderungen" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.frontend_commits.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
