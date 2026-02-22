@@ -317,11 +317,11 @@ download_latest_release "frontend-" "$WEB_DIR" "Frontend"
 echo_step 84 "Frontend Backend-URL konfigurieren..."
 sudo tee "$WEB_DIR/config.json" > /dev/null <<EOF
 {
-  "API_URL": "https://$SERVER_HOST:453/",
+  "API_URL": "https://$IP_ADDR:453/",
   "APP_ENV": "production"
 }
 EOF
-echo "[OK] Frontend config.json auf 'https://$SERVER_HOST:453/' gesetzt."
+echo "[OK] Frontend config.json auf 'https://$IP_ADDR:453/' gesetzt."
 
 ### 85% Rechte setzen
 echo_step 85 "Setze Rechte für /var/www/html..."
