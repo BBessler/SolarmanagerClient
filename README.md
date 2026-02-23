@@ -8,7 +8,56 @@ Energiemanagementsystem zur intelligenten Steuerung von PV-Anlagen, Wallboxen, B
 - Internetverbindung
 - SSH-Zugang zum Pi
 
-## Installation
+## Installation mit Docker (empfohlen)
+
+Docker vereinfacht die Installation und Updates auf einen einzigen Befehl.
+
+### Setup
+
+```bash
+wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_docker.sh
+chmod +x setup_docker.sh
+./setup_docker.sh
+```
+
+Das Script installiert automatisch:
+- Docker (falls nicht vorhanden)
+- Solarmanager Backend + Frontend (neueste GitHub-Releases)
+- MariaDB Datenbank (als Container, Daten persistent)
+- Caddy Reverse-Proxy mit HTTPS (Self-Signed-Zertifikat)
+- mDNS/Avahi (bei `.local`-Hostname)
+- Frontend-Konfiguration (API-URL automatisch gesetzt)
+
+### Update (Docker)
+
+```bash
+wget -O update_docker.sh https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/update_docker.sh
+chmod +x update_docker.sh
+./update_docker.sh
+```
+
+### Zugriff (Docker)
+
+| Dienst | URL |
+|--------|-----|
+| Frontend | `https://solarmanager.local` |
+| API/Swagger | `https://solarmanager.local/swagger` |
+
+### Nuetzliche Docker-Befehle
+
+```bash
+cd ~/solarmanager
+docker compose logs -f          # Logs anzeigen
+docker compose restart           # Neu starten
+docker compose down              # Stoppen
+docker compose up -d             # Starten
+```
+
+---
+
+## Native Installation (ohne Docker)
+
+> Alternative zur Docker-Installation. Installiert alle Komponenten direkt auf dem System.
 
 ### 1. Setup-Script herunterladen und ausführen
 

@@ -1,0 +1,66 @@
+services:
+  solarmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: solarmanager
+    restart: unless-stopped
+    volumes:
+      - ./app:/app
+    environment:
+      - ConnectionDb=server=mariadb;database=solardb;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
+      - ConnectionStrings__MySQLServer_OCPP=server=mariadb;database=ocpp;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - solarmanager
+
+  mariadb:
+    image: mariadb:11
+    container_name: solarmanager-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-solarmanager}
+      - MYSQL_USER=${MYSQL_USER:-pi}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-solarmanager}
+      - MYSQL_DATABASE=solardb
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - solarmanager
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: solarmanager-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SERVER_HOST=${SERVER_HOST:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - solarmanager
+    networks:
+      - solarmanager
+
+volumes:
+  mariadb-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  solarmanager:
+    driver: bridge
