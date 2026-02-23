@@ -5,39 +5,15 @@ services:
       dockerfile: Dockerfile
     container_name: solarmanager
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./app:/app
     environment:
-      - ConnectionDb=server=mariadb;database=solardb;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
-      - ConnectionStrings__MySQLServer_OCPP=server=mariadb;database=ocpp;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
+      - ConnectionDb=server=host.docker.internal;database=solardb;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
+      - ConnectionStrings__MySQLServer_OCPP=server=host.docker.internal;database=ocpp;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
-    depends_on:
-      mariadb:
-        condition: service_healthy
-    networks:
-      - solarmanager
-
-  mariadb:
-    image: linuxserver/mariadb:latest
-    container_name: solarmanager-db
-    restart: unless-stopped
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Berlin
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-solarmanager}
-      - MYSQL_USER=${MYSQL_USER:-pi}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-solarmanager}
-      - MYSQL_DATABASE=solardb
-    volumes:
-      - mariadb-data:/config
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-solarmanager}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     networks:
       - solarmanager
 
@@ -70,7 +46,6 @@ services:
       - portainer-data:/data
 
 volumes:
-  mariadb-data:
   caddy-data:
   caddy-config:
   portainer-data:
