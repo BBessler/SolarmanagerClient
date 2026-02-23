@@ -20,6 +20,8 @@ chmod +x setup_docker.sh
 ./setup_docker.sh
 ```
 
+> **Hinweis:** Falls Docker noch nicht installiert ist, wird es automatisch eingerichtet. Danach muss man sich einmal **neu einloggen** (SSH-Session schließen und öffnen) und das Script erneut ausführen.
+
 Das Script installiert automatisch:
 - Docker (falls nicht vorhanden)
 - Solarmanager Backend + Frontend (neueste GitHub-Releases)
