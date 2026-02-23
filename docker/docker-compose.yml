@@ -56,10 +56,21 @@ services:
     networks:
       - solarmanager
 
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: solarmanager-portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer-data:/data
+
 volumes:
   mariadb-data:
   caddy-data:
   caddy-config:
+  portainer-data:
 
 networks:
   solarmanager:

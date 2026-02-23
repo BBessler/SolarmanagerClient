@@ -44,6 +44,7 @@ chmod +x update_docker.sh
 |--------|-----|
 | Frontend | `https://solarmanager.local` |
 | API/Swagger | `https://solarmanager.local/swagger` |
+| Portainer (Docker-Verwaltung) | `https://solarmanager.local:9443` |
 
 ### Nuetzliche Docker-Befehle
 
