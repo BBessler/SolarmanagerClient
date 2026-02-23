@@ -1,4 +1,4 @@
-{$SERVER_HOST:localhost} {
+{$SERVER_HOST:localhost}, {$SERVER_IP:} {
 	reverse_proxy solarmanager:8080
 	tls internal
 }

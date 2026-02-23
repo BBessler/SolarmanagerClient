@@ -142,9 +142,14 @@ curl -fsSL "$REPO_RAW/docker/Dockerfile" -o Dockerfile
 curl -fsSL "$REPO_RAW/docker/Caddyfile" -o Caddyfile
 curl -fsSL "$REPO_RAW/docker/.env.example" -o .env.example
 
+# IP-Adresse automatisch ermitteln
+SERVER_IP=$(hostname -I | awk '{print $1}')
+echo "[INFO] Erkannte IP-Adresse: $SERVER_IP"
+
 # .env erstellen/aktualisieren
 cp .env.example .env
 sed -i "s|^SERVER_HOST=.*|SERVER_HOST=$hostname|" .env
+sed -i "s|^SERVER_IP=.*|SERVER_IP=$SERVER_IP|" .env
 sed -i "s|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=$db_password|" .env
 sed -i "s|^MYSQL_PASSWORD=.*|MYSQL_PASSWORD=$db_password|" .env
 
