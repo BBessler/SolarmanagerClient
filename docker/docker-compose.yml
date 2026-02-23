@@ -19,18 +19,21 @@ services:
       - solarmanager
 
   mariadb:
-    image: mariadb:11
+    image: linuxserver/mariadb:latest
     container_name: solarmanager-db
     restart: unless-stopped
     environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-solarmanager}
       - MYSQL_USER=${MYSQL_USER:-pi}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-solarmanager}
       - MYSQL_DATABASE=solardb
     volumes:
-      - mariadb-data:/var/lib/mysql
+      - mariadb-data:/config
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-solarmanager}"]
       interval: 10s
       timeout: 5s
       retries: 5
