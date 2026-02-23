@@ -97,7 +97,7 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           gh api repos/BBessler/Solarmanager/actions/workflows/release.yaml/dispatches \
-            -f ref=main
+            -f ref=master
 
       # 4. Frontend-Release-Workflow triggern
       - name: Frontend-Release triggern
