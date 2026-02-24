@@ -7,7 +7,7 @@
 set -e
 
 INSTALL_DIR="$HOME/solarmanager"
-GITHUB_RELEASE_REPO="BBessler/SolarmanagerClient"
+GITHUB_RELEASE_REPO="BBessler/Solarmanager"
 VERSION_FILE="$INSTALL_DIR/.versions"
 
 if [ ! -f "$INSTALL_DIR/docker-compose.yml" ]; then
