@@ -5,7 +5,7 @@
 
 set -e
 
-GITHUB_RELEASE_REPO="BBessler/SolarmanagerClient"
+GITHUB_RELEASE_REPO="BBessler/Solarmanager"
 WEB_DIR="/var/www/html"
 VERSION_FILE="/var/www/html/.solarmanager_versions"
 
