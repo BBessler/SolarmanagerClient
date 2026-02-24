@@ -8,7 +8,7 @@
 set -e
 
 INSTALL_DIR="$HOME/solarmanager"
-GITHUB_RELEASE_REPO="BBessler/SolarmanagerClient"
+GITHUB_RELEASE_REPO="BBessler/Solarmanager"
 REPO_RAW="https://raw.githubusercontent.com/$GITHUB_RELEASE_REPO/main"
 
 echo "============================================"
