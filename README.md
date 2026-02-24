@@ -28,7 +28,7 @@ Docker vereinfacht die Installation und Updates auf einen einzigen Befehl.
 ### Setup
 
 ```bash
-wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_docker.sh
+wget https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/setup_docker.sh
 chmod +x setup_docker.sh
 ./setup_docker.sh
 ```
@@ -46,7 +46,7 @@ Das Script installiert automatisch:
 ### Update (Docker)
 
 ```bash
-wget -O update_docker.sh https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/update_docker.sh
+wget -O update_docker.sh https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/update_docker.sh
 chmod +x update_docker.sh
 ./update_docker.sh
 ```
@@ -80,7 +80,7 @@ docker compose up -d             # Starten
 Per SSH auf dem Raspberry Pi einloggen und folgende Befehle ausführen:
 
 ```bash
-wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_solarmanager.sh
+wget https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/setup_solarmanager.sh
 chmod +x setup_solarmanager.sh
 sudo ./setup_solarmanager.sh
 ```
@@ -101,7 +101,7 @@ Das Script installiert und konfiguriert automatisch:
 Falls eine bestehende Datenbank-Sicherung (`solardb.sql`) importiert werden soll:
 
 ```bash
-wget https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/setup_DB.sh
+wget https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/setup_DB.sh
 chmod +x setup_DB.sh
 sudo ./setup_DB.sh
 ```
@@ -139,7 +139,7 @@ sudo journalctl -u solarmanager.service -f
 Um Backend und Frontend auf die neueste Version zu aktualisieren:
 
 ```bash
-wget -O update_solarmanager.sh https://raw.githubusercontent.com/BBessler/SolarmanagerClient/main/install/update_solarmanager.sh
+wget -O update_solarmanager.sh https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/update_solarmanager.sh
 chmod +x update_solarmanager.sh
 sudo ./update_solarmanager.sh
 ```
