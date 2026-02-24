@@ -260,7 +260,7 @@ sudo pip3 install hyundai-kia-connect-api bimmer_connected --break-system-packag
 ### 83% GitHub Releases herunterladen
 echo_step 83 "Lade Solarmanager Backend und Frontend von GitHub herunter..."
 
-GITHUB_RELEASE_REPO="BBessler/SolarmanagerClient"
+GITHUB_RELEASE_REPO="BBessler/Solarmanager"
 WEB_DIR="/var/www/html"
 
 # Funktion: Neuestes Release-Asset nach Tag-Prefix herunterladen und entpacken
