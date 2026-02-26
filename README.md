@@ -61,6 +61,8 @@ chmod +x update_docker.sh
 Um die neueste Beta-Version (Pre-Release) zu installieren:
 
 ```bash
+wget -O update_docker.sh https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/update_docker.sh
+chmod +x update_docker.sh
 ./update_docker.sh --beta
 ```
 
@@ -231,6 +233,8 @@ Das Update-Script:
 #### Beta/Test-Version installieren
 
 ```bash
+wget -O update_solarmanager.sh https://raw.githubusercontent.com/BBessler/Solarmanager/main/install/update_solarmanager.sh
+chmod +x update_solarmanager.sh
 sudo ./update_solarmanager.sh --beta
 ```
 
