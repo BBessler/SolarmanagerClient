@@ -1,4 +1,11 @@
-{$SERVER_HOST:localhost}, {$SERVER_IP:} {
+# IP-Zugriff: Weiterleitung auf Hostname
+{$SERVER_IP:} {
+	redir https://{$SERVER_HOST:localhost}{uri} permanent
+	tls internal
+}
+
+# Hauptseite ueber Hostname
+{$SERVER_HOST:localhost} {
 	handle_path /phpmyadmin/* {
 		reverse_proxy host.docker.internal:8081
 	}

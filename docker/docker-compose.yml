@@ -18,6 +18,8 @@ services:
     image: caddy:2-alpine
     container_name: solarmanager-proxy
     restart: unless-stopped
+    networks:
+      - solarmanager-net
     ports:
       - "80:80"
       - "443:443"
@@ -35,11 +37,21 @@ services:
     image: portainer/portainer-ce:latest
     container_name: solarmanager-portainer
     restart: unless-stopped
+    networks:
+      - solarmanager-net
     ports:
       - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - portainer-data:/data
+
+networks:
+  solarmanager-net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
 
 volumes:
   caddy-data:

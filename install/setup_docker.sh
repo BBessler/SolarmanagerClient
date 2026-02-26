@@ -510,6 +510,31 @@ if ! command -v docker &> /dev/null; then
     echo "[OK] Docker wurde installiert."
 fi
 
+# IPv6 deaktivieren und Docker auf IPv4 konfigurieren
+echo "[INFO] Konfiguriere Docker fuer IPv4..."
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null 2>&1
+sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null 2>&1
+
+# IPv6 dauerhaft deaktivieren
+if ! grep -q "net.ipv6.conf.all.disable_ipv6" /etc/sysctl.conf 2>/dev/null; then
+    sudo bash -c 'cat >> /etc/sysctl.conf <<SYSEOF
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+SYSEOF'
+fi
+
+# Docker Daemon auf IPv4 konfigurieren
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json > /dev/null <<DEOF
+{
+  "ip6tables": false,
+  "dns": ["8.8.8.8", "8.8.4.4"]
+}
+DEOF
+
+sudo systemctl restart docker 2>/dev/null || true
+echo "[OK] Docker auf IPv4 konfiguriert."
+
 if [ "$DOCKER_JUST_INSTALLED" = true ]; then
     echo ""
     echo "[OK] MariaDB, phpMyAdmin und Docker wurden eingerichtet."
@@ -621,43 +646,18 @@ echo "[OK] Frontend config.json konfiguriert."
 # Phase 6: Docker Image bauen und Container starten
 # =============================================================================
 echo ""
-# Falls beim letzten Lauf der IPv4-Fallback gesetzt wurde, erneut aktivieren
-if [ -f /etc/docker/daemon.json ] && grep -q "ip6tables" /etc/docker/daemon.json 2>/dev/null; then
-    echo "[INFO] IPv4-Fallback aus vorherigem Lauf erkannt, deaktiviere IPv6..."
-    sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null 2>&1
-    sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null 2>&1
+echo "[INFO] Baue Docker Image und starte Container..."
+if ! docker compose build; then
+    echo "[FEHLER] Docker Image konnte nicht gebaut werden."
+    echo "         Logs pruefen: docker compose logs"
+    exit 1
 fi
 
-echo "[INFO] Baue Docker Image und starte Container..."
-MAX_RETRIES=3
-RETRY=0
-until docker compose build && docker compose up -d; do
-    RETRY=$((RETRY + 1))
-    if [ $RETRY -ge $MAX_RETRIES ]; then
-        echo "[WARNUNG] Docker-Start nach $MAX_RETRIES Versuchen fehlgeschlagen."
-        echo "[INFO] Versuche mit IPv4-Fallback..."
-        # Docker auf IPv4 zwingen via sysctl und daemon.json
-        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1 > /dev/null 2>&1
-        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1 > /dev/null 2>&1
-        sudo tee /etc/docker/daemon.json > /dev/null <<DEOF
-{
-  "ip6tables": false,
-  "dns": ["8.8.8.8", "8.8.4.4"]
-}
-DEOF
-        sudo systemctl restart docker
-        sleep 5
-        if docker compose build && docker compose up -d; then
-            echo "[OK] Docker-Start mit IPv4-Fallback erfolgreich."
-        else
-            echo "[FEHLER] Docker-Start auch mit IPv4-Fallback fehlgeschlagen."
-            exit 1
-        fi
-        break
-    fi
-    echo "[WARNUNG] Docker-Fehler. Neuer Versuch ($RETRY/$MAX_RETRIES) in 10 Sekunden..."
-    sleep 10
-done
+if ! docker compose up -d; then
+    echo "[FEHLER] Docker Container konnten nicht gestartet werden."
+    echo "         Logs pruefen: docker compose logs"
+    exit 1
+fi
 
 echo ""
 echo "[INFO] Warte auf Backend-Start..."
