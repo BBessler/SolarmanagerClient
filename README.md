@@ -56,6 +56,17 @@ chmod +x update_docker.sh
 ./update_docker.sh
 ```
 
+#### Beta/Test-Version installieren
+
+Um die neueste Beta-Version (Pre-Release) zu installieren:
+
+```bash
+./update_docker.sh --beta
+```
+
+> [!NOTE]
+> Beta-Releases sind als Pre-Release auf GitHub markiert. Das Standard-Update (`./update_docker.sh`) installiert nur stabile Releases — ein Produktivsystem bekommt nie versehentlich eine Beta-Version.
+
 ### Zugriff
 
 | Dienst | URL |
@@ -216,6 +227,15 @@ Das Update-Script:
 - Lädt die neuesten Releases herunter
 - Sichert und stellt die Frontend-Konfiguration (`config.json`) automatisch wieder her
 - Startet das Backend neu
+
+#### Beta/Test-Version installieren
+
+```bash
+sudo ./update_solarmanager.sh --beta
+```
+
+> [!NOTE]
+> Beta-Releases sind als Pre-Release auf GitHub markiert. Das Standard-Update installiert nur stabile Releases.
 
 ### Zugriff
 

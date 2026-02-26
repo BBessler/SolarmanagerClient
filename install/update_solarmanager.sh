@@ -5,11 +5,17 @@
 
 set -e
 
+# Update-Channel: stable (Standard) oder beta
+CHANNEL="stable"
+if [[ "$1" == "--beta" ]]; then
+    CHANNEL="beta"
+fi
+
 GITHUB_RELEASE_REPO="BBessler/Solarmanager"
 WEB_DIR="/var/www/html"
 VERSION_FILE="/var/www/html/.solarmanager_versions"
 
-echo "### Solarmanager Update ###"
+echo "### Solarmanager Update ($CHANNEL) ###"
 echo ""
 
 # Installierte Versionen laden (falls vorhanden)
@@ -33,10 +39,17 @@ fi
 # Neueste Version und Download-URL fuer ein Tag-Prefix ermitteln
 get_latest() {
   local tag_prefix="$1"
+  local channel="$2"
   echo "$RELEASES" | python3 -c "
 import sys, json
 releases = json.load(sys.stdin)
+channel = '$channel'
 for r in releases:
+    is_pre = r.get('prerelease', False)
+    if channel == 'beta' and not is_pre:
+        continue
+    if channel == 'stable' and is_pre:
+        continue
     if r['tag_name'].startswith('$tag_prefix'):
         url = r['assets'][0]['browser_download_url'] if r['assets'] else ''
         print(r['tag_name'] + '|' + url)
@@ -56,11 +69,17 @@ download_and_extract() {
   rm -f "$tmp_file"
 }
 
-LATEST_BACKEND_INFO=$(get_latest "backend-")
+if [ "$CHANNEL" = "beta" ]; then
+  LATEST_BACKEND_INFO=$(get_latest "beta-backend-" "beta")
+  LATEST_FRONTEND_INFO=$(get_latest "beta-frontend-" "beta")
+else
+  LATEST_BACKEND_INFO=$(get_latest "backend-" "stable")
+  LATEST_FRONTEND_INFO=$(get_latest "frontend-" "stable")
+fi
+
 LATEST_BACKEND_TAG=$(echo "$LATEST_BACKEND_INFO" | cut -d'|' -f1)
 LATEST_BACKEND_URL=$(echo "$LATEST_BACKEND_INFO" | cut -d'|' -f2)
 
-LATEST_FRONTEND_INFO=$(get_latest "frontend-")
 LATEST_FRONTEND_TAG=$(echo "$LATEST_FRONTEND_INFO" | cut -d'|' -f1)
 LATEST_FRONTEND_URL=$(echo "$LATEST_FRONTEND_INFO" | cut -d'|' -f2)
 
