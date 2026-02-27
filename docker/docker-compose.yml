@@ -1,0 +1,61 @@
+services:
+  solarmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: solarmanager
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./app:/app
+    environment:
+      - ConnectionStrings__ConnectionDb=server=127.0.0.1;database=solardb;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
+      - ConnectionStrings__MySQLServer_OCPP=server=127.0.0.1;database=ocpp;user=${MYSQL_USER:-pi};password=${MYSQL_PASSWORD:-solarmanager};Max Pool Size=500;
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: solarmanager-proxy
+    restart: unless-stopped
+    networks:
+      - solarmanager-net
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SERVER_HOST=${SERVER_HOST:-localhost}
+      - SERVER_IP=${SERVER_IP:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: solarmanager-portainer
+    restart: unless-stopped
+    networks:
+      - solarmanager-net
+    ports:
+      - "9443:9443"
+    command: --admin-password-file /tmp/portainer_password
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer-data:/data
+      - ./portainer_password:/tmp/portainer_password:ro
+
+networks:
+  solarmanager-net:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  caddy-data:
+  caddy-config:
+  portainer-data:
