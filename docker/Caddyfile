@@ -1,0 +1,25 @@
+{
+	default_sni {$SERVER_HOST}
+	auto_https disable_redirects
+}
+
+{$SERVER_HOST}, {$SERVER_IP} {
+	handle_path /phpmyadmin/* {
+		reverse_proxy host.docker.internal:8081
+	}
+	handle /phpmyadmin {
+		redir /phpmyadmin/ permanent
+	}
+	reverse_proxy host.docker.internal:8080
+	tls internal
+}
+
+:80 {
+	handle_path /phpmyadmin/* {
+		reverse_proxy host.docker.internal:8081
+	}
+	handle /phpmyadmin {
+		redir /phpmyadmin/ permanent
+	}
+	reverse_proxy host.docker.internal:8080
+}
